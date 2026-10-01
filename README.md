@@ -35,6 +35,21 @@ flowchart TD
 
 Notebooks 01–05 are the working notebooks from the project, cleaned up but not rewritten. Some cells read intermediate files that aren't included. Notebook 06 runs end to end from `data/`.
 
+## How the text pipeline works
+
+**1. Finding on-topic posts.** Posts are de-duplicated, and each post's title and body are joined. A post is kept if it matches a keyword pattern (`doge`, `dogecoin`, `elon`, `hodl`, `memecoin`, …) or if it is close in meaning to a few hand-written reference sentences, such as "dogecoin community" or "elon musk dogecoin tweet". Closeness is the cosine similarity between TF-IDF vectors, saved as `semantic_score`. This keeps relevant posts that never use an exact keyword.
+
+**2. Deciding how to score emotion.** I tried three approaches on a small $WIF sample (201 posts). Each one fixed a problem with the one before:
+- FinBERT (`yiyanghkust/finbert-tone`) only gives positive / neutral / negative, so it can't tell fear from sadness.
+- An LLM returning structured JSON gives a role tag (Community / Speculation / Celebrity) and six emotion scores for each post.
+- Early prompts treated plain facts ("price is $0.08") as emotional. I changed the prompt to first decide whether a post is a fact, an opinion or a question, and added a rule-based pre-filter that catches obviously factual posts.
+
+For the full sample, the final prompt ([`scripts/score_emotions_atf.py`](scripts/score_emotions_atf.py)) defines each emotion with the Appraisal Tendency Framework: its valence, its arousal and the trading behaviour it predicts. For example, fear leads to panic selling, anger to contrarian buying and trust to holding. Fear and anger are both negative, but they are scored separately because they push trading in opposite directions.
+
+**3. Scoring 57,000 posts.** Sending one request at a time would have taken more than a day. The first full pass therefore ran asynchronously (`asyncio` + `aiohttp`), with at most 10 requests at once and automatic retries. The final pass was split into two halves that ran in parallel. Both versions write each result to disk as soon as it arrives, so a stopped run picks up from the last post it scored.
+
+**4. From posts to daily series.** Post scores are averaged by day (in the paper, weighted by upvotes). This gives six daily emotion series, which are lined up with market, on-chain and attention data for the 365 days of 2022.
+
 ## Data
 
 | File | Contents |
@@ -47,7 +62,7 @@ Details and sources are in [`data/README.md`](data/README.md). The raw post text
 
 ## Reproducing the final model
 
-The paper's emotion scores come from the final prompt (`scripts/score_emotions_atf.py`) and are weighted by each post's upvotes. Notebook 06 uses the scores from the first full pass, with every post weighted equally. Against the paper's equal-weighted column (Table 3, column 3), it gives:
+The paper's emotion scores come from the final prompt (`scripts/score_emotions_atf.py`) and are weighted by each post's upvotes. Those final scores and the upvote counts weren't kept after the project, so the paper's exact numbers can't be rerun from this repo. Notebook 06 uses the scores from the first full pass instead, with every post weighted equally. Against the paper's equal-weighted column (Table 3, column 3), it gives:
 
 | | Paper | This repo |
 |---|---|---|
