@@ -1,0 +1,23 @@
+pandas
+numpy
+scipy
+statsmodels
+scikit-learn
+matplotlib
+seaborn
+openpyxl
+jupyter
+
+# LLM scoring (notebooks 01-03, scripts/score_emotions_atf.py)
+openai
+aiohttp
+nest_asyncio
+tqdm
+
+# market data (notebook 04)
+requests
+yfinance
+
+# FinBERT baseline (notebook 02, optional)
+transformers
+torch
